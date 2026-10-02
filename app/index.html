@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wi-Fi AP</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--fg:#1d2330;--mut:#6b7385;--line:#e3e6ec;--good:#2e9d5b;--warn:#c98a00;--bad:#d9534f;--acc:#2f6fdf;--chip:#eef2fb}
+@media (prefers-color-scheme:dark){:root{--bg:#1e1f22;--card:#27282c;--fg:#e8eaed;--mut:#9aa0ab;--line:#3a3c42;--acc:#5b8ff0;--chip:#2f3440}}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:16px}
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+h1{font-size:20px;margin:0 0 4px}
+h2{font-size:15px;margin:0}
+.sub{color:var(--mut);margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.between{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+button{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:9px 16px;font-size:14px;cursor:pointer}
+button.sec{background:transparent;color:var(--acc);border:1px solid var(--line)}
+button.danger{background:var(--bad)}
+button.small{padding:6px 10px;font-size:12.5px}
+button:disabled{opacity:.5;cursor:default}
+input[type=text],input[type=password],select{width:100%;background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit}
+label.f{display:block;font-size:12px;color:var(--mut);margin:10px 0 3px}
+label.cb{display:flex;gap:8px;align-items:center;margin-top:12px;font-size:13px;cursor:pointer}
+.lang{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex-shrink:0}
+.lang button{background:transparent;color:var(--mut);border-radius:0;padding:6px 10px;font-size:12px;font-weight:600}
+.lang button[aria-pressed="true"]{background:var(--acc);color:#fff}
+.chip{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;background:var(--chip);color:var(--mut);margin-left:6px;vertical-align:1px}
+.chip.on{background:var(--good);color:#fff}
+.chip.bad{background:var(--bad);color:#fff}
+.kv{display:grid;grid-template-columns:130px 1fr;gap:4px 10px;font-size:13px;margin-top:12px}
+.kv div:nth-child(odd){color:var(--mut)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.pw{display:flex;gap:6px}
+.pw input{flex:1}
+.banner{border-radius:10px;padding:12px 16px;margin-bottom:16px;border:1px solid}
+.banner.warn{background:color-mix(in srgb,var(--warn) 12%,var(--card));border-color:var(--warn)}
+.banner.bad{background:color-mix(in srgb,var(--bad) 12%,var(--card));border-color:var(--bad)}
+.banner pre{white-space:pre-wrap;font-size:11.5px;margin:8px 0 0;color:var(--mut)}
+.note{font-size:12px;color:var(--mut);margin:8px 0 0}
+.err{color:var(--bad);font-size:13px;margin-top:8px;font-weight:600}
+.ok{color:var(--good);font-size:13px;margin-top:8px;font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:10px}
+td,th{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;font-size:13px}
+th{color:var(--mut);font-weight:600;font-size:12px}
+td.nw{white-space:nowrap}
+.qr{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.qr img{width:180px;height:180px;background:#fff;border-radius:8px;padding:4px}
+.empty{color:var(--mut);font-size:13px;margin-top:10px}
+@media (max-width:520px){.two{grid-template-columns:1fr}.kv{grid-template-columns:110px 1fr}}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div>
+    <h1 data-i18n="title"></h1>
+    <p class="sub" data-i18n="subtitle"></p>
+  </div>
+  <div class="lang" role="group" aria-label="Language"><button data-lang="es">ES</button><button data-lang="en">EN</button></div>
+</header>
+
+<div id="banners"></div>
+
+<div class="grid">
+  <div class="card">
+    <div class="between"><h2><span data-i18n="status_title"></span> <span id="chip" class="chip"></span></h2>
+      <button id="toggleBtn"></button></div>
+    <div class="kv" id="statusKv"></div>
+    <div class="err" id="toggleErr"></div>
+  </div>
+
+  <div class="card" id="qrCard">
+    <h2 data-i18n="qr_title"></h2>
+    <div class="qr"><img id="qrImg" alt="QR">
+      <div class="kv" style="margin:0;grid-template-columns:auto 1fr"><div>SSID</div><div class="mono" id="qrSsid"></div>
+        <div data-i18n="password"></div><div class="mono" id="qrPw"></div></div></div>
+    <p class="note" data-i18n="qr_note"></p>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2 data-i18n="config_title"></h2>
+    <label class="f">SSID</label><input type="text" id="ssid" maxlength="32">
+    <label class="f" data-i18n="security"></label>
+    <select id="security">
+      <option value="wpa2">WPA2</option><option value="wpa2wpa3">WPA2/WPA3</option>
+      <option value="wpa3">WPA3</option><option value="open" data-i18n="open"></option>
+    </select>
+    <div id="pwBox"><label class="f" data-i18n="password"></label>
+      <div class="pw"><input type="password" id="password" maxlength="63" autocomplete="new-password">
+        <button class="sec small" id="showPw" type="button" data-i18n="show"></button>
+        <button class="sec small" id="genPw" type="button" data-i18n="generate"></button></div></div>
+    <label class="cb"><input type="checkbox" id="hidden"> <span data-i18n="hidden"></span></label>
+    <label class="f" data-i18n="channel"></label><select id="channel"></select>
+    <p class="note" data-i18n="channel_note"></p>
+    <div class="two">
+      <div><label class="f" data-i18n="subnet"></label><input type="text" id="subnet" class="mono"></div>
+      <div><label class="f" data-i18n="country"></label><input type="text" id="country" maxlength="2" class="mono"></div>
+    </div>
+    <label class="cb"><input type="checkbox" id="nat"> <span data-i18n="nat"></span></label>
+    <div class="row" style="margin-top:14px"><button id="saveBtn" data-i18n="save"></button><span id="saveMsg"></span></div>
+  </div>
+
+  <div class="card">
+    <div class="between"><h2><span data-i18n="clients_title"></span> <span class="chip" id="clientCount">0</span></h2></div>
+    <table id="clientTable" hidden><thead><tr><th data-i18n="device"></th><th>IP</th><th data-i18n="signal"></th><th data-i18n="connected"></th><th data-i18n="traffic"></th></tr></thead><tbody></tbody></table>
+    <p class="empty" id="noClients" data-i18n="no_clients"></p>
+  </div>
+</div>
+</main>
+
+<script>
+const I18N = {
+  es: {
+    title: 'Punto de acceso Wi-Fi', subtitle: 'Crea una red Wi-Fi desde el hub, sin desconectarlo de su red actual.',
+    status_title: 'Estado', on: 'Activo', off: 'Apagado', failed: 'Error', turn_on: 'Activar AP', turn_off: 'Desactivar AP',
+    working: 'Aplicando…', ssid: 'SSID', security: 'Seguridad', open: 'Abierta (sin contraseña)', password: 'Contraseña',
+    show: 'Ver', hide: 'Ocultar', generate: 'Generar', hidden: 'Red oculta (no anunciar el SSID)',
+    band: 'Banda', band_auto: 'Automática', channel: 'Canal', ch_auto: 'Automático (igual que el cliente)',
+    ch_auto_free: 'Automático (mejor canal libre)', channel_note: 'Solo 2,4 GHz (el chip no soporta AP en 5 GHz). La antena es compartida: en «Automático», si el hub está conectado a una Wi-Fi de 2,4 GHz usa su mismo canal (lo más estable); si no, escanea y elige el canal 1, 6 u 11 más libre.',
+    subnet: 'IP del hub en el AP', country: 'País (regulatorio)', nat: 'Compartir internet (NAT)', save: 'Guardar',
+    saved: 'Guardado', saved_on: 'Guardado y aplicado',
+    config_title: 'Configuración', qr_title: 'Conectar con el móvil', qr_note: 'Escanea el código con la cámara para conectarte.',
+    clients_title: 'Dispositivos conectados', no_clients: 'No hay dispositivos conectados.', device: 'Dispositivo', signal: 'Señal',
+    connected: 'Conectado', traffic: 'Tráfico ↓/↑',
+    k_channel: 'Canal', k_ip: 'IP del hub', k_uplink: 'Conexión del hub', k_nat: 'Internet', k_clients: 'Clientes',
+    yes_nat: 'Compartido (NAT)', no_nat: 'Solo red local', follows: 'sigue a {0}', best_free: 'mejor canal libre', none: '—', eth_only: 'Sin Wi-Fi cliente',
+    warn_5ghz: 'La Wi-Fi del hub está en 5 GHz (canal {1}) y el AP solo puede ir en 2,4 GHz, así que está en el canal {0}. La radio alterna entre ambas bandas: si notas cortes, conecta el hub a la red de 2,4 GHz o usa Ethernet.',
+    warn_channel: 'El AP está en el canal {0} y la Wi-Fi del hub en el {1}. El chip puede trabajar en canales distintos, pero si notas cortes vuelve a «Automático».',
+    err_title: 'No se pudo levantar el punto de acceso', no_hostapd: 'Falta el binario hostapd en {0}.',
+    err_cmd: 'Fallo al ejecutar {0}: {1}', err_no_radio: 'No se encuentra la interfaz Wi-Fi del hub.',
+    err_no_hostapd: 'No se encuentra hostapd en {0}.', err_hostapd: 'hostapd no pudo arrancar el AP: {0}',
+    err_dnsmasq: 'dnsmasq no pudo arrancar: {0}', err_ssid: 'El SSID debe tener entre 1 y 32 bytes.',
+    err_security: 'Seguridad no válida.', err_password: 'La contraseña debe tener entre 8 y 63 caracteres ASCII.',
+    err_band: 'Banda no válida.', err_channel: 'Canal no válido para esa banda.', err_country: 'El país son 2 letras (p. ej. ES).',
+    err_subnet: 'IP no válida: usa una IPv4 privada con máscara entre /16 y /28 (p. ej. 10.42.0.1/24).',
+    err_overlap: 'Esa red se solapa con {0}, que ya usa el hub.', err_qr: 'qrencode no está disponible.',
+    err_json: 'Petición no válida', lost: 'Sin respuesta del hub…', log: 'Últimas líneas de hostapd',
+    ago_s: '{0} s', ago_m: '{0} min', ago_h: '{0} h {1} min',
+  },
+  en: {
+    title: 'Wi-Fi access point', subtitle: 'Create a Wi-Fi network from the hub without disconnecting it from its current network.',
+    status_title: 'Status', on: 'Active', off: 'Off', failed: 'Error', turn_on: 'Turn AP on', turn_off: 'Turn AP off',
+    working: 'Applying…', ssid: 'SSID', security: 'Security', open: 'Open (no password)', password: 'Password',
+    show: 'Show', hide: 'Hide', generate: 'Generate', hidden: 'Hidden network (do not broadcast SSID)',
+    band: 'Band', band_auto: 'Automatic', channel: 'Channel', ch_auto: 'Automatic (same as client)',
+    ch_auto_free: 'Automatic (least busy channel)', channel_note: '2.4 GHz only (the chip does not support AP mode on 5 GHz). The radio is shared: in "Automatic", if the hub is connected to a 2.4 GHz Wi-Fi it uses the same channel (most stable); otherwise it scans and picks the least busy of channels 1, 6 and 11.',
+    subnet: 'Hub IP on the AP', country: 'Country (regulatory)', nat: 'Share internet (NAT)', save: 'Save',
+    saved: 'Saved', saved_on: 'Saved and applied',
+    config_title: 'Settings', qr_title: 'Connect with your phone', qr_note: 'Scan the code with the camera to connect.',
+    clients_title: 'Connected devices', no_clients: 'No devices connected.', device: 'Device', signal: 'Signal',
+    connected: 'Connected', traffic: 'Traffic ↓/↑',
+    k_channel: 'Channel', k_ip: 'Hub IP', k_uplink: 'Hub uplink', k_nat: 'Internet', k_clients: 'Clients',
+    yes_nat: 'Shared (NAT)', no_nat: 'Local network only', follows: 'follows {0}', best_free: 'least busy channel', none: '—', eth_only: 'No Wi-Fi client',
+    warn_5ghz: 'The hub Wi-Fi is on 5 GHz (channel {1}) and the AP can only use 2.4 GHz, so it is on channel {0}. The radio switches between both: if you see drops, connect the hub to the 2.4 GHz network or use Ethernet.',
+    warn_channel: 'The AP is on channel {0} and the hub\'s Wi-Fi on {1}. The chip can work on different channels, but if you see drops switch back to "Automatic".',
+    err_title: 'The access point could not be started', no_hostapd: 'The hostapd binary is missing at {0}.',
+    err_cmd: 'Command {0} failed: {1}', err_no_radio: 'The hub Wi-Fi interface was not found.',
+    err_no_hostapd: 'hostapd not found at {0}.', err_hostapd: 'hostapd could not start the AP: {0}',
+    err_dnsmasq: 'dnsmasq could not start: {0}', err_ssid: 'The SSID must be 1 to 32 bytes.',
+    err_security: 'Invalid security.', err_password: 'The password must be 8 to 63 ASCII characters.',
+    err_band: 'Invalid band.', err_channel: 'Invalid channel for that band.', err_country: 'Country is 2 letters (e.g. ES).',
+    err_subnet: 'Invalid IP: use a private IPv4 with a /16 to /28 mask (e.g. 10.42.0.1/24).',
+    err_overlap: 'That network overlaps {0}, already used by the hub.', err_qr: 'qrencode is not available.',
+    err_json: 'Invalid request', lost: 'No response from the hub…', log: 'Last hostapd lines',
+    ago_s: '{0} s', ago_m: '{0} min', ago_h: '{0} h {1} min',
+  },
+};
+const pickLang = () => {
+  try { const s = localStorage.getItem('wap-lang'); if (I18N[s]) return s; } catch (e) {}
+  return (navigator.language || 'es').toLowerCase().startsWith('es') ? 'es' : 'en';
+};
+let lang = pickLang();
+const t = (k, ...a) => { const v = (I18N[lang] || I18N.es)[k]; return v === undefined ? k : v.replace(/\{(\d)\}/g, (m, i) => a[i] !== undefined ? a[i] : m); };
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let S = null, dirty = false, busy = false, qrKey = '';
+
+function applyI18n() {
+  document.documentElement.lang = lang;
+  document.querySelectorAll('[data-i18n]').forEach(e => { e.textContent = t(e.dataset.i18n); });
+  document.querySelectorAll('.lang button').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === lang));
+  $('showPw').textContent = t($('password').type === 'password' ? 'show' : 'hide');
+}
+document.querySelectorAll('.lang button').forEach(b => b.onclick = () => {
+  lang = b.dataset.lang; try { localStorage.setItem('wap-lang', lang); } catch (e) {}
+  applyI18n(); fillChannels(); render();
+});
+
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  const j = await r.json();
+  if (!r.ok) { const e = new Error(t(j.error, ...(j.args || []))); e.data = j; throw e; }
+  return j;
+}
+
+function fillChannels() {
+  const sel = $('channel'), cur = sel.value || (S ? String(S.config.channel) : '0');
+  const chs = !S ? [] : S.channels['2.4'];
+  const autoTxt = S && S.client && S.client.channel && S.client.channel <= 14 ? t('ch_auto') : t('ch_auto_free');
+  sel.innerHTML = `<option value="0">${esc(autoTxt)}</option>` + chs.map(c => `<option value="${c}">${c}</option>`).join('');
+  sel.value = chs.includes(+cur) ? cur : '0';
+}
+
+function loadForm() {
+  const c = S.config;
+  $('ssid').value = c.ssid; $('security').value = c.security; $('password').value = c.password;
+  $('hidden').checked = c.hidden; $('subnet').value = c.subnet;
+  $('country').value = c.country; $('nat').checked = c.nat;
+  $('channel').value = String(c.channel); fillChannels(); $('channel').value = String(c.channel);
+  $('pwBox').hidden = c.security === 'open';
+}
+['ssid', 'security', 'password', 'hidden', 'channel', 'subnet', 'country', 'nat'].forEach(id => {
+  $(id).addEventListener('input', () => { dirty = true; $('saveMsg').textContent = ''; $('saveMsg').className = ''; });
+});
+$('security').addEventListener('change', () => { $('pwBox').hidden = $('security').value === 'open'; });
+$('showPw').onclick = () => { $('password').type = $('password').type === 'password' ? 'text' : 'password'; applyI18n(); };
+$('genPw').onclick = async () => { try { const j = await api('api/password'); $('password').value = j.password; $('password').type = 'text'; applyI18n(); dirty = true; } catch (e) {} };
+
+const fmtBytes = n => n == null ? '' : n > 1e9 ? (n / 1e9).toFixed(1) + ' GB' : n > 1e6 ? (n / 1e6).toFixed(1) + ' MB' : n > 1e3 ? (n / 1e3).toFixed(0) + ' kB' : n + ' B';
+const fmtTime = s => s == null ? '' : s < 60 ? t('ago_s', s) : s < 3600 ? t('ago_m', Math.floor(s / 60)) : t('ago_h', Math.floor(s / 3600), Math.floor(s % 3600 / 60));
+
+function render() {
+  if (!S) return;
+  const c = S.config, ap = S.ap, failed = c.enabled && !S.running && S.error;
+  $('chip').textContent = S.running ? t('on') : failed ? t('failed') : t('off');
+  $('chip').className = 'chip ' + (S.running ? 'on' : failed ? 'bad' : '');
+  const tb = $('toggleBtn');
+  tb.textContent = busy ? t('working') : t(c.enabled ? 'turn_off' : 'turn_on');
+  tb.className = c.enabled ? 'danger' : '';
+  tb.disabled = busy || !S.hostapd_found;
+  const uplink = S.client ? `${esc(S.client.ssid || S.client.iface)}${S.client.channel ? ' · ' + S.client.channel : ''}` : t('eth_only');
+  const rows = [
+    [t('ssid'), `<span class="mono">${esc(c.ssid)}</span>${c.hidden ? ' <span class="chip">' + esc(t('hidden').split(' (')[0]) + '</span>' : ''}`],
+    [t('security'), c.security === 'open' ? t('open') : c.security.toUpperCase().replace('WPA2WPA3', 'WPA2/WPA3')],
+    [t('k_channel'), ap ? `${ap.channel} (2,4 GHz)${ap.follows ? ' · ' + esc(t('follows', S.client ? (S.client.ssid || S.client.iface) : '')) : ap.mode === 'best' ? ' · ' + esc(t('best_free')) : ''}` : t('none')],
+    [t('k_ip'), ap ? `<span class="mono">${esc(ap.ip)}</span>` : `<span class="mono">${esc(c.subnet.split('/')[0])}</span>`],
+    [t('k_nat'), c.nat ? t('yes_nat') : t('no_nat')],
+    [t('k_uplink'), uplink],
+    [t('k_clients'), String(S.clients.length)],
+  ];
+  $('statusKv').innerHTML = rows.map(r => `<div>${esc(r[0])}</div><div>${r[1]}</div>`).join('');
+
+  let b = '';
+  if (!S.hostapd_found) b += `<div class="banner bad"><b>${esc(t('err_title'))}</b><div>${esc(t('err_no_hostapd', 'hostapd'))}</div></div>`;
+  else if (failed) b += `<div class="banner bad"><b>${esc(t('err_title'))}</b><div>${esc(t(S.error, ...(S.error_args || [])))}</div>${S.log && S.log.length ? `<pre>${esc(S.log.join('\n'))}</pre>` : ''}</div>`;
+  if (S.running && S.warning) b += `<div class="banner warn">${esc(t(...S.warning))}</div>`;
+  $('banners').innerHTML = b;
+
+  const key = [c.ssid, c.password, c.security, c.hidden].join('|');
+  if (key !== qrKey) { qrKey = key; $('qrImg').src = 'api/qr.svg?k=' + Date.now(); }
+  $('qrSsid').textContent = c.ssid; $('qrPw').textContent = c.security === 'open' ? '—' : c.password;
+
+  $('clientCount').textContent = S.clients.length;
+  $('clientTable').hidden = !S.clients.length; $('noClients').hidden = !!S.clients.length;
+  $('clientTable').querySelector('tbody').innerHTML = S.clients.map(x =>
+    `<tr><td>${x.name ? esc(x.name) + '<br>' : ''}<span class="mono">${esc(x.mac)}</span></td><td class="mono">${esc(x.ip || '')}</td>` +
+    `<td class="nw">${x.signal != null ? x.signal + ' dBm' : ''}</td><td class="nw">${fmtTime(x.connected_time)}</td>` +
+    `<td class="nw">${fmtBytes(x.tx_bytes)} / ${fmtBytes(x.rx_bytes)}</td></tr>`).join('');
+}
+
+async function refresh() {
+  try {
+    S = await api('api/state');
+    if (!dirty) loadForm();
+    render();
+  } catch (e) {
+    $('banners').innerHTML = `<div class="banner warn">${esc(t('lost'))}</div>`;
+  }
+}
+
+$('toggleBtn').onclick = async () => {
+  busy = true; $('toggleErr').textContent = ''; render();
+  try { S = await api('api/enable', {enabled: !S.config.enabled}); }
+  catch (e) { $('toggleErr').textContent = e.message; await refresh(); }
+  busy = false; render();
+};
+
+$('saveBtn').onclick = async () => {
+  const body = {ssid: $('ssid').value, security: $('security').value, password: $('password').value,
+    hidden: $('hidden').checked, channel: +$('channel').value,
+    subnet: $('subnet').value.trim(), country: $('country').value.trim(), nat: $('nat').checked};
+  $('saveBtn').disabled = true; $('saveMsg').className = ''; $('saveMsg').textContent = t('working');
+  try {
+    S = await api('api/config', body); dirty = false; loadForm(); render();
+    $('saveMsg').className = 'ok'; $('saveMsg').textContent = t(S.config.enabled ? 'saved_on' : 'saved');
+  } catch (e) { $('saveMsg').className = 'err'; $('saveMsg').textContent = e.message; refresh(); }
+  $('saveBtn').disabled = false;
+};
+
+applyI18n();
+refresh();
+setInterval(() => { if (!busy) refresh(); }, 5000);
+</script>
+</body>
+</html>

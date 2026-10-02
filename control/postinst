@@ -1,0 +1,20 @@
+#!/bin/sh
+
+. /usr/lib/smhub/service-helpers.sh
+
+PKG_NAME="wifi-ap"
+SERVICE_NAME="wifi-ap"
+AUTOSTART_FILE="/opt/share/services/${SERVICE_NAME}.autostart"
+
+mkdir -p /opt/wifi-ap/data
+chmod 700 /opt/wifi-ap/data
+# keep NetworkManager away from the virtual AP interface
+if [ -d /etc/NetworkManager/conf.d ]; then
+    printf '[keyfile]\nunmanaged-devices=interface-name:ap0\n' > /etc/NetworkManager/conf.d/90-wifi-ap.conf 2>/dev/null && \
+        nmcli general reload conf >/dev/null 2>&1 || true
+fi
+pkg_openrc_install "${PKG_NAME}" "${SERVICE_NAME}" "${AUTOSTART_FILE}"
+touch "${AUTOSTART_FILE}"
+rc-service "${SERVICE_NAME}" restart 2>/dev/null || rc-service "${SERVICE_NAME}" start 2>/dev/null || true
+
+exit 0

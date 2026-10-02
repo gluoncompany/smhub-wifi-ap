@@ -1,0 +1,19 @@
+#!/sbin/openrc-run
+
+description="Wi-Fi access point service"
+
+supervisor="supervise-daemon"
+command="/usr/bin/python3"
+command_args="/opt/wifi-ap/server.py"
+pidfile="/var/run/wifi-ap.pid"
+output_log="/var/log/wifi-ap.log"
+error_log="/var/log/wifi-ap.log"
+
+export WAP_PORT=8096
+export WAP_DATA=/opt/wifi-ap/data
+
+depend() {
+    need localmount
+    after api-ready networkmanager
+    provide wifi-ap
+}

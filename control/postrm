@@ -1,0 +1,13 @@
+#!/bin/sh
+
+. /usr/lib/smhub/service-helpers.sh
+
+pkg_service_remove "wifi-ap" "$1"
+
+if [ "$1" = "remove" ]; then
+    rm -f /opt/share/services/wifi-ap.autostart
+    rm -f /etc/NetworkManager/conf.d/90-wifi-ap.conf
+    nmcli general reload conf >/dev/null 2>&1 || true
+fi
+
+exit 0
