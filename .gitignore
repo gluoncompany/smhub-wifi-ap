@@ -1,0 +1,6 @@
+feed/
+__pycache__/
+*.pyc
+app/hostapd
+app/hostapd_cli
+hostapd/build/
