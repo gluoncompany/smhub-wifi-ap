@@ -1,5 +1,5 @@
 Package: wifi-ap
-Version: 1.0.3-1
+Version: 1.0.7-1
 Architecture: all
 Maintainer: local
 Description: Wi-Fi access point - create a Wi-Fi network from the hub (AP + client at the same time) with DHCP, NAT, WPA2/WPA3 and QR code

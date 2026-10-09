@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.7
+- 5 GHz option removed again after testing it in exclusive mode: hostapd reports AP-ENABLED on channels 36-48 but the network is not visible. The app is 2.4 GHz only.
+- Startup is faster in exclusive mode: no longer waits up to 45 s for the hub Wi-Fi at boot.
+
+## 1.0.6
+- Confirmation before turning the AP on in exclusive mode: warns that the hub Wi-Fi will be disconnected, shows whether a wired connection is detected (and blocks activation without cable when internet sharing is on) and warns if the panel is being used through the hub Wi-Fi.
+- Warning banner when exclusive mode is on and no wired connection is detected.
+- Experimental 5 GHz option (removed in 1.0.7).
+
+## 1.0.5
+- New "Exclusive AP" mode (on by default): while the AP is on, the hub Wi-Fi client is disconnected (its profiles lose autoconnect) and restored when the AP is turned off or the service stops. The hub uses Ethernet. With the AIC8800, the AP and a connected Wi-Fi client do not work reliably together (beacons are intermittent).
+- Exclusive mode needs a wired uplink when internet sharing is on (`err_no_ethernet`).
+- Fixed the watchdog overwriting the "reconnect on 2.4 GHz" decision.
+
+## 1.0.4
+- When following the hub Wi-Fi channel, the AP uses the same channel width (HT40+/-) as the client.
+
 ## 1.0.3
 - New option "Keep the hub Wi-Fi on 2.4 GHz" (on by default): while the AP is on, the hub's Wi-Fi profiles are locked to 2.4 GHz and the hub reconnects if it was on 5 GHz; the original band is restored when the AP is turned off. With the AIC8800 the AP does not transmit while the hub is connected on 5 GHz (hostapd reports AP-ENABLED but no beacons are sent).
 

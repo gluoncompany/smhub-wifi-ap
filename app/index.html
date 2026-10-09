@@ -53,6 +53,11 @@ td.nw{white-space:nowrap}
 .qr{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:12px}
 .qr img{width:180px;height:180px;background:#fff;border-radius:8px;padding:4px}
 .empty{color:var(--mut);font-size:13px;margin-top:10px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
+.modal .card{max-width:480px;width:100%}
+.modal p{margin:10px 0}
+.modal .row{justify-content:flex-end;margin-top:16px}
+.check{font-weight:600;margin:10px 0}.check.good{color:var(--good)}.check.bad{color:var(--bad)}
 @media (max-width:520px){.two{grid-template-columns:1fr}.kv{grid-template-columns:110px 1fr}}
 </style>
 </head>
@@ -106,8 +111,10 @@ td.nw{white-space:nowrap}
       <div><label class="f" data-i18n="country"></label><input type="text" id="country" maxlength="2" class="mono"></div>
     </div>
     <label class="cb"><input type="checkbox" id="nat"> <span data-i18n="nat"></span></label>
-    <label class="cb"><input type="checkbox" id="lock_24"> <span data-i18n="lock_24"></span></label>
-    <p class="note" data-i18n="lock_24_note"></p>
+    <label class="cb"><input type="checkbox" id="exclusive"> <span data-i18n="exclusive"></span></label>
+    <p class="note" data-i18n="exclusive_note"></p>
+    <div id="lockBox"><label class="cb"><input type="checkbox" id="lock_24"> <span data-i18n="lock_24"></span></label>
+    <p class="note" data-i18n="lock_24_note"></p></div>
     <div class="row" style="margin-top:14px"><button id="saveBtn" data-i18n="save"></button><span id="saveMsg"></span></div>
   </div>
 
@@ -119,15 +126,25 @@ td.nw{white-space:nowrap}
 </div>
 </main>
 
+<div class="modal" id="confirm" hidden role="dialog" aria-modal="true">
+  <div class="card">
+    <h2 data-i18n="cf_title"></h2>
+    <p data-i18n="cf_text"></p>
+    <div class="check" id="cfCable"></div>
+    <p class="err" id="cfPanel" hidden></p>
+    <div class="row"><button class="sec" id="cfNo" data-i18n="cancel"></button><button id="cfYes"></button></div>
+  </div>
+</div>
+
 <script>
 const I18N = {
   es: {
-    title: 'Punto de acceso Wi-Fi', subtitle: 'Crea una red Wi-Fi desde el hub, sin desconectarlo de su red actual.',
+    title: 'Punto de acceso Wi-Fi', subtitle: 'Crea una red Wi-Fi desde el hub para conectar dispositivos domóticos.',
     status_title: 'Estado', on: 'Activo', off: 'Apagado', failed: 'Error', turn_on: 'Activar AP', turn_off: 'Desactivar AP',
     working: 'Aplicando…', ssid: 'SSID', security: 'Seguridad', open: 'Abierta (sin contraseña)', password: 'Contraseña',
     show: 'Ver', hide: 'Ocultar', generate: 'Generar', hidden: 'Red oculta (no anunciar el SSID)',
     band: 'Banda', band_auto: 'Automática', channel: 'Canal', ch_auto: 'Automático (igual que el cliente)',
-    ch_auto_free: 'Automático (mejor canal libre)', channel_note: 'Solo 2,4 GHz (el chip no soporta AP en 5 GHz). La antena es compartida: en «Automático», si el hub está conectado a una Wi-Fi de 2,4 GHz usa su mismo canal (lo más estable); si no, escanea y elige el canal 1, 6 u 11 más libre.',
+    ch_auto_free: 'Automático (mejor canal libre)', channel_note: 'Solo 2,4 GHz: en 5 GHz el chip no funciona como AP. En «Automático» escanea y elige el canal 1, 6 u 11 más libre (o el de la Wi-Fi del hub si no es AP exclusivo y está en 2,4 GHz).', cf_title: 'Antes de activar el AP', cf_text: 'Mientras el AP esté activo, la conexión Wi-Fi de la antena se desconecta y la antena solo tendrá red por cable. Comprueba que el cable de red de la antena está conectado.', cf_cable_ok: '✓ Conexión por cable detectada ({0})', cf_cable_no: '✗ No se detecta conexión por cable', cf_cable_nat: '✗ No se detecta conexión por cable: sin cable no se puede compartir internet (desactiva «Compartir internet» o conecta el cable).', cf_panel: 'Estás usando este panel a través de la Wi-Fi de la antena ({0}): perderás la conexión con el panel al activar el AP.', cf_yes: 'Activar AP', cf_save: 'Guardar y aplicar', cancel: 'Cancelar', warn_no_cable: 'El modo AP exclusivo necesita la antena conectada por cable y no se detecta ninguna conexión por cable.',
     subnet: 'IP del hub en el AP', country: 'País (regulatorio)', nat: 'Compartir internet (NAT)', save: 'Guardar',
     saved: 'Guardado', saved_on: 'Guardado y aplicado',
     config_title: 'Configuración', qr_title: 'Conectar con el móvil', qr_note: 'Escanea el código con la cámara para conectarte.',
@@ -135,6 +152,7 @@ const I18N = {
     connected: 'Conectado', traffic: 'Tráfico ↓/↑',
     k_channel: 'Canal', k_ip: 'IP del hub', k_uplink: 'Conexión del hub', k_nat: 'Internet', k_clients: 'Clientes',
     yes_nat: 'Compartido (NAT)', no_nat: 'Solo red local', follows: 'sigue a {0}', best_free: 'mejor canal libre', none: '—', eth_only: 'Sin Wi-Fi cliente',
+    exclusive: 'AP exclusivo (recomendado)', exclusive_note: 'Mientras el AP está activo, la Wi-Fi del hub se desconecta y el hub sale a internet por cable. Este chip no mantiene bien el AP y la Wi-Fi cliente a la vez. Al apagar el AP, la Wi-Fi del hub vuelve a conectarse.', err_no_ethernet: 'El modo AP exclusivo necesita el hub conectado por cable (o desactiva «Compartir internet»).', k_uplink_eth: 'Cable ({0}) · Wi-Fi desconectada por el AP',
     lock_24: 'Mantener la Wi-Fi del hub en 2,4 GHz', lock_24_note: 'Necesario para que el AP se vea: con este chip, si el hub está conectado a una Wi-Fi en 5 GHz el AP no emite. Al desactivar el AP, la Wi-Fi del hub vuelve a su banda original.',
     warn_5ghz: 'La Wi-Fi del hub está en 5 GHz (canal {1}): con este chip el AP no emite mientras el hub esté conectado en 5 GHz. Activa «Mantener la Wi-Fi del hub en 2,4 GHz» o conecta el hub por cable y desconecta su Wi-Fi.',
     warn_channel: 'El AP está en el canal {0} y la Wi-Fi del hub en el {1}. El chip puede trabajar en canales distintos, pero si notas cortes vuelve a «Automático».',
@@ -150,12 +168,12 @@ const I18N = {
     ago_s: '{0} s', ago_m: '{0} min', ago_h: '{0} h {1} min',
   },
   en: {
-    title: 'Wi-Fi access point', subtitle: 'Create a Wi-Fi network from the hub without disconnecting it from its current network.',
+    title: 'Wi-Fi access point', subtitle: 'Create a Wi-Fi network from the hub to connect home-automation devices.',
     status_title: 'Status', on: 'Active', off: 'Off', failed: 'Error', turn_on: 'Turn AP on', turn_off: 'Turn AP off',
     working: 'Applying…', ssid: 'SSID', security: 'Security', open: 'Open (no password)', password: 'Password',
     show: 'Show', hide: 'Hide', generate: 'Generate', hidden: 'Hidden network (do not broadcast SSID)',
     band: 'Band', band_auto: 'Automatic', channel: 'Channel', ch_auto: 'Automatic (same as client)',
-    ch_auto_free: 'Automatic (least busy channel)', channel_note: '2.4 GHz only (the chip does not support AP mode on 5 GHz). The radio is shared: in "Automatic", if the hub is connected to a 2.4 GHz Wi-Fi it uses the same channel (most stable); otherwise it scans and picks the least busy of channels 1, 6 and 11.',
+    ch_auto_free: 'Automatic (least busy channel)', channel_note: '2.4 GHz only: the chip does not work as an AP on 5 GHz. In "Automatic" it scans and picks the least busy of channels 1, 6 and 11 (or the hub Wi-Fi channel when not in exclusive mode and the hub is on 2.4 GHz).', cf_title: 'Before turning the AP on', cf_text: 'While the AP is on, the hub Wi-Fi connection is disconnected and the hub only has a wired network. Check that the hub network cable is plugged in.', cf_cable_ok: '✓ Wired connection detected ({0})', cf_cable_no: '✗ No wired connection detected', cf_cable_nat: '✗ No wired connection detected: internet cannot be shared without a cable (turn off "Share internet" or plug the cable in).', cf_panel: 'You are using this panel through the hub Wi-Fi ({0}): you will lose the connection to the panel when the AP turns on.', cf_yes: 'Turn AP on', cf_save: 'Save and apply', cancel: 'Cancel', warn_no_cable: 'Exclusive AP mode needs the hub connected by cable and no wired connection is detected.',
     subnet: 'Hub IP on the AP', country: 'Country (regulatory)', nat: 'Share internet (NAT)', save: 'Save',
     saved: 'Saved', saved_on: 'Saved and applied',
     config_title: 'Settings', qr_title: 'Connect with your phone', qr_note: 'Scan the code with the camera to connect.',
@@ -163,6 +181,7 @@ const I18N = {
     connected: 'Connected', traffic: 'Traffic ↓/↑',
     k_channel: 'Channel', k_ip: 'Hub IP', k_uplink: 'Hub uplink', k_nat: 'Internet', k_clients: 'Clients',
     yes_nat: 'Shared (NAT)', no_nat: 'Local network only', follows: 'follows {0}', best_free: 'least busy channel', none: '—', eth_only: 'No Wi-Fi client',
+    exclusive: 'Exclusive AP (recommended)', exclusive_note: 'While the AP is on, the hub Wi-Fi is disconnected and the hub uses Ethernet for internet. This chip does not keep the AP and the Wi-Fi client running reliably at the same time. When the AP is turned off, the hub Wi-Fi reconnects.', err_no_ethernet: 'Exclusive AP mode needs the hub connected by cable (or turn off "Share internet").', k_uplink_eth: 'Cable ({0}) · Wi-Fi disconnected by the AP',
     lock_24: 'Keep the hub Wi-Fi on 2.4 GHz', lock_24_note: 'Needed for the AP to be visible: with this chip, if the hub is connected to a Wi-Fi on 5 GHz the AP does not transmit. When the AP is turned off, the hub Wi-Fi goes back to its original band.',
     warn_5ghz: 'The hub Wi-Fi is on 5 GHz (channel {1}): with this chip the AP does not transmit while the hub is connected on 5 GHz. Turn on "Keep the hub Wi-Fi on 2.4 GHz" or connect the hub by cable and disconnect its Wi-Fi.',
     warn_channel: 'The AP is on channel {0} and the hub\'s Wi-Fi on {1}. The chip can work on different channels, but if you see drops switch back to "Automatic".',
@@ -209,7 +228,7 @@ async function api(path, body) {
 function fillChannels() {
   const sel = $('channel'), cur = sel.value || (S ? String(S.config.channel) : '0');
   const chs = !S ? [] : S.channels['2.4'];
-  const autoTxt = S && S.client && S.client.channel && S.client.channel <= 14 ? t('ch_auto') : t('ch_auto_free');
+  const autoTxt = !$('exclusive').checked && S && S.client && S.client.channel && S.client.channel <= 14 ? t('ch_auto') : t('ch_auto_free');
   sel.innerHTML = `<option value="0">${esc(autoTxt)}</option>` + chs.map(c => `<option value="${c}">${c}</option>`).join('');
   sel.value = chs.includes(+cur) ? cur : '0';
 }
@@ -218,13 +237,14 @@ function loadForm() {
   const c = S.config;
   $('ssid').value = c.ssid; $('security').value = c.security; $('password').value = c.password;
   $('hidden').checked = c.hidden; $('subnet').value = c.subnet;
-  $('country').value = c.country; $('nat').checked = c.nat; $('lock_24').checked = c.lock_24;
+  $('country').value = c.country; $('nat').checked = c.nat; $('lock_24').checked = c.lock_24; $('exclusive').checked = c.exclusive; $('lockBox').hidden = c.exclusive;
   $('channel').value = String(c.channel); fillChannels(); $('channel').value = String(c.channel);
   $('pwBox').hidden = c.security === 'open';
 }
-['ssid', 'security', 'password', 'hidden', 'channel', 'subnet', 'country', 'nat', 'lock_24'].forEach(id => {
+['ssid', 'security', 'password', 'hidden', 'channel', 'subnet', 'country', 'nat', 'lock_24', 'exclusive'].forEach(id => {
   $(id).addEventListener('input', () => { dirty = true; $('saveMsg').textContent = ''; $('saveMsg').className = ''; });
 });
+$('exclusive').addEventListener('change', () => { $('lockBox').hidden = $('exclusive').checked; fillChannels(); });
 $('security').addEventListener('change', () => { $('pwBox').hidden = $('security').value === 'open'; });
 $('showPw').onclick = () => { $('password').type = $('password').type === 'password' ? 'text' : 'password'; applyI18n(); };
 $('genPw').onclick = async () => { try { const j = await api('api/password'); $('password').value = j.password; $('password').type = 'text'; applyI18n(); dirty = true; } catch (e) {} };
@@ -241,7 +261,7 @@ function render() {
   tb.textContent = busy ? t('working') : t(c.enabled ? 'turn_off' : 'turn_on');
   tb.className = c.enabled ? 'danger' : '';
   tb.disabled = busy || !S.hostapd_found;
-  const uplink = S.client ? `${esc(S.client.ssid || S.client.iface)}${S.client.channel ? ' · ' + S.client.channel : ''}` : t('eth_only');
+  const uplink = (S.client_released && S.uplink) ? esc(t('k_uplink_eth', S.uplink)) : S.client ? `${esc(S.client.ssid || S.client.iface)}${S.client.channel ? ' · ' + S.client.channel : ''}` : t('eth_only');
   const rows = [
     [t('ssid'), `<span class="mono">${esc(c.ssid)}</span>${c.hidden ? ' <span class="chip">' + esc(t('hidden').split(' (')[0]) + '</span>' : ''}`],
     [t('security'), c.security === 'open' ? t('open') : c.security.toUpperCase().replace('WPA2WPA3', 'WPA2/WPA3')],
@@ -257,6 +277,7 @@ function render() {
   if (!S.hostapd_found) b += `<div class="banner bad"><b>${esc(t('err_title'))}</b><div>${esc(t('err_no_hostapd', 'hostapd'))}</div></div>`;
   else if (failed) b += `<div class="banner bad"><b>${esc(t('err_title'))}</b><div>${esc(t(S.error, ...(S.error_args || [])))}</div>${S.log && S.log.length ? `<pre>${esc(S.log.join('\n'))}</pre>` : ''}</div>`;
   if (S.running && S.warning) b += `<div class="banner warn">${esc(t(...S.warning))}</div>`;
+  if (c.exclusive && !S.uplink && !(S.client_released && S.running)) b += `<div class="banner warn">${esc(t('warn_no_cable'))}</div>`;
   $('banners').innerHTML = b;
 
   const key = [c.ssid, c.password, c.security, c.hidden].join('|');
@@ -281,7 +302,24 @@ async function refresh() {
   }
 }
 
+// in-page confirmation (no browser dialogs): resolves true/false
+function confirmExclusive(yesKey) {
+  return new Promise(resolve => {
+    const nat = $('nat').checked, up = S.uplink;
+    $('cfCable').textContent = up ? t('cf_cable_ok', up) : t(nat ? 'cf_cable_nat' : 'cf_cable_no');
+    $('cfCable').className = 'check ' + (up ? 'good' : 'bad');
+    const viaWifi = S.client_ip && location.hostname === S.client_ip;
+    $('cfPanel').hidden = !viaWifi; $('cfPanel').textContent = viaWifi ? t('cf_panel', S.client_ip) : '';
+    $('cfYes').textContent = t(yesKey); $('cfYes').disabled = nat && !up;
+    $('confirm').hidden = false; $('cfNo').focus();
+    const done = v => { $('confirm').hidden = true; $('cfYes').onclick = $('cfNo').onclick = null; resolve(v); };
+    $('cfYes').onclick = () => done(true); $('cfNo').onclick = () => done(false);
+  });
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('confirm').hidden) $('cfNo').click(); });
+
 $('toggleBtn').onclick = async () => {
+  if (!S.config.enabled && S.config.exclusive && !(await confirmExclusive('cf_yes'))) return;
   busy = true; $('toggleErr').textContent = ''; render();
   try { S = await api('api/enable', {enabled: !S.config.enabled}); }
   catch (e) { $('toggleErr').textContent = e.message; await refresh(); }
@@ -289,9 +327,10 @@ $('toggleBtn').onclick = async () => {
 };
 
 $('saveBtn').onclick = async () => {
+  if (S.config.enabled && !S.config.exclusive && $('exclusive').checked && !(await confirmExclusive('cf_save'))) return;
   const body = {ssid: $('ssid').value, security: $('security').value, password: $('password').value,
     hidden: $('hidden').checked, channel: +$('channel').value,
-    subnet: $('subnet').value.trim(), country: $('country').value.trim(), nat: $('nat').checked, lock_24: $('lock_24').checked};
+    subnet: $('subnet').value.trim(), country: $('country').value.trim(), nat: $('nat').checked, lock_24: $('lock_24').checked, exclusive: $('exclusive').checked};
   $('saveBtn').disabled = true; $('saveMsg').className = ''; $('saveMsg').textContent = t('working');
   try {
     S = await api('api/config', body); dirty = false; loadForm(); render();
