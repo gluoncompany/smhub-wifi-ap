@@ -106,6 +106,8 @@ td.nw{white-space:nowrap}
       <div><label class="f" data-i18n="country"></label><input type="text" id="country" maxlength="2" class="mono"></div>
     </div>
     <label class="cb"><input type="checkbox" id="nat"> <span data-i18n="nat"></span></label>
+    <label class="cb"><input type="checkbox" id="lock_24"> <span data-i18n="lock_24"></span></label>
+    <p class="note" data-i18n="lock_24_note"></p>
     <div class="row" style="margin-top:14px"><button id="saveBtn" data-i18n="save"></button><span id="saveMsg"></span></div>
   </div>
 
@@ -133,7 +135,8 @@ const I18N = {
     connected: 'Conectado', traffic: 'Tráfico ↓/↑',
     k_channel: 'Canal', k_ip: 'IP del hub', k_uplink: 'Conexión del hub', k_nat: 'Internet', k_clients: 'Clientes',
     yes_nat: 'Compartido (NAT)', no_nat: 'Solo red local', follows: 'sigue a {0}', best_free: 'mejor canal libre', none: '—', eth_only: 'Sin Wi-Fi cliente',
-    warn_5ghz: 'La Wi-Fi del hub está en 5 GHz (canal {1}) y el AP solo puede ir en 2,4 GHz, así que está en el canal {0}. La radio alterna entre ambas bandas: si notas cortes, conecta el hub a la red de 2,4 GHz o usa Ethernet.',
+    lock_24: 'Mantener la Wi-Fi del hub en 2,4 GHz', lock_24_note: 'Necesario para que el AP se vea: con este chip, si el hub está conectado a una Wi-Fi en 5 GHz el AP no emite. Al desactivar el AP, la Wi-Fi del hub vuelve a su banda original.',
+    warn_5ghz: 'La Wi-Fi del hub está en 5 GHz (canal {1}): con este chip el AP no emite mientras el hub esté conectado en 5 GHz. Activa «Mantener la Wi-Fi del hub en 2,4 GHz» o conecta el hub por cable y desconecta su Wi-Fi.',
     warn_channel: 'El AP está en el canal {0} y la Wi-Fi del hub en el {1}. El chip puede trabajar en canales distintos, pero si notas cortes vuelve a «Automático».',
     err_title: 'No se pudo levantar el punto de acceso', no_hostapd: 'Falta el binario hostapd en {0}.',
     err_cmd: 'Fallo al ejecutar {0}: {1}', err_no_radio: 'No se encuentra la interfaz Wi-Fi del hub.',
@@ -160,7 +163,8 @@ const I18N = {
     connected: 'Connected', traffic: 'Traffic ↓/↑',
     k_channel: 'Channel', k_ip: 'Hub IP', k_uplink: 'Hub uplink', k_nat: 'Internet', k_clients: 'Clients',
     yes_nat: 'Shared (NAT)', no_nat: 'Local network only', follows: 'follows {0}', best_free: 'least busy channel', none: '—', eth_only: 'No Wi-Fi client',
-    warn_5ghz: 'The hub Wi-Fi is on 5 GHz (channel {1}) and the AP can only use 2.4 GHz, so it is on channel {0}. The radio switches between both: if you see drops, connect the hub to the 2.4 GHz network or use Ethernet.',
+    lock_24: 'Keep the hub Wi-Fi on 2.4 GHz', lock_24_note: 'Needed for the AP to be visible: with this chip, if the hub is connected to a Wi-Fi on 5 GHz the AP does not transmit. When the AP is turned off, the hub Wi-Fi goes back to its original band.',
+    warn_5ghz: 'The hub Wi-Fi is on 5 GHz (channel {1}): with this chip the AP does not transmit while the hub is connected on 5 GHz. Turn on "Keep the hub Wi-Fi on 2.4 GHz" or connect the hub by cable and disconnect its Wi-Fi.',
     warn_channel: 'The AP is on channel {0} and the hub\'s Wi-Fi on {1}. The chip can work on different channels, but if you see drops switch back to "Automatic".',
     err_title: 'The access point could not be started', no_hostapd: 'The hostapd binary is missing at {0}.',
     err_cmd: 'Command {0} failed: {1}', err_no_radio: 'The hub Wi-Fi interface was not found.',
@@ -214,11 +218,11 @@ function loadForm() {
   const c = S.config;
   $('ssid').value = c.ssid; $('security').value = c.security; $('password').value = c.password;
   $('hidden').checked = c.hidden; $('subnet').value = c.subnet;
-  $('country').value = c.country; $('nat').checked = c.nat;
+  $('country').value = c.country; $('nat').checked = c.nat; $('lock_24').checked = c.lock_24;
   $('channel').value = String(c.channel); fillChannels(); $('channel').value = String(c.channel);
   $('pwBox').hidden = c.security === 'open';
 }
-['ssid', 'security', 'password', 'hidden', 'channel', 'subnet', 'country', 'nat'].forEach(id => {
+['ssid', 'security', 'password', 'hidden', 'channel', 'subnet', 'country', 'nat', 'lock_24'].forEach(id => {
   $(id).addEventListener('input', () => { dirty = true; $('saveMsg').textContent = ''; $('saveMsg').className = ''; });
 });
 $('security').addEventListener('change', () => { $('pwBox').hidden = $('security').value === 'open'; });
@@ -287,7 +291,7 @@ $('toggleBtn').onclick = async () => {
 $('saveBtn').onclick = async () => {
   const body = {ssid: $('ssid').value, security: $('security').value, password: $('password').value,
     hidden: $('hidden').checked, channel: +$('channel').value,
-    subnet: $('subnet').value.trim(), country: $('country').value.trim(), nat: $('nat').checked};
+    subnet: $('subnet').value.trim(), country: $('country').value.trim(), nat: $('nat').checked, lock_24: $('lock_24').checked};
   $('saveBtn').disabled = true; $('saveMsg').className = ''; $('saveMsg').textContent = t('working');
   try {
     S = await api('api/config', body); dirty = false; loadForm(); render();

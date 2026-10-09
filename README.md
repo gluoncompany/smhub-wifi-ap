@@ -7,6 +7,7 @@ A small app for **SMLIGHT SMHUB OS** that creates a Wi-Fi network from the hub *
 - **WPA2, WPA2/WPA3, WPA3 or open**, hidden SSID, password generator.
 - **Automatic channel**: if the hub is connected to a 2.4 GHz Wi-Fi, the AP uses the same channel (the radio is shared, so this is the most stable option) and follows it if it changes; otherwise it scans and picks the least busy of channels 1, 6 and 11. Manual channel 1–13 is also possible.
 - **QR code** to connect a phone, and a **list of connected devices** (name, MAC, IP, signal, connected time, traffic).
+- Keeps the hub's own Wi-Fi on 2.4 GHz while the AP is on (required by the AIC8800 chip), restoring the original band afterwards.
 - The AP comes back after a reboot if it was enabled; a watchdog restarts it if hostapd stops.
 - Shows up in the hub panel like any other app (sidebar + iframe), with a **Spanish / English** UI and light/dark theme.
 
@@ -16,7 +17,7 @@ A small app for **SMLIGHT SMHUB OS** that creates a Wi-Fi network from the hub *
 - `hostapd` built for the hub (see below): the `wpa_supplicant` shipped with SMHUB OS has no AP mode and there is no `hostapd` package, so NetworkManager cannot create access points.
 - Everything else is already in SMHUB OS: `iw`, `dnsmasq`, `iptables`, `nmcli`, `qrencode` and Python 3 (standard library only).
 
-**2.4 GHz only.** On the SMHUB Nano, starting an access point on 5 GHz hangs the AIC8800 driver and the hardware watchdog reboots the hub, so the app never uses 5 GHz. If the hub itself is connected to a 5 GHz network, the AP runs on 2.4 GHz and the radio alternates between both bands (a warning is shown).
+**2.4 GHz only.** On the SMHUB Nano, starting an access point on 5 GHz hangs the AIC8800 driver and the hardware watchdog reboots the hub, so the app never uses 5 GHz. The AP also does not transmit while the hub itself is connected to a Wi-Fi on 5 GHz, so by default (option **Keep the hub Wi-Fi on 2.4 GHz**) the app locks the hub's Wi-Fi profiles to 2.4 GHz while the AP is on and restores their original band when it is turned off.
 
 ## How it works
 
