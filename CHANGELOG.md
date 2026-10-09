@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.8
+- The "Exclusive AP" option is gone: the hub Wi-Fi is always disconnected while the AP is on (AP + client at the same time did not work reliably on the AIC8800).
+- Removed what only existed for AP + client mode: the "Keep the hub Wi-Fi on 2.4 GHz" option (band lock), following the hub Wi-Fi channel (and HT40), and the "hub on 5 GHz" / "different channel" warnings. The automatic channel is always the least busy of 1, 6 and 11.
+- On upgrade, a band lock left by older versions is undone at startup; old `exclusive` / `lock_24` settings are ignored.
+
 ## 1.0.7
 - 5 GHz option removed again after testing it in exclusive mode: hostapd reports AP-ENABLED on channels 36-48 but the network is not visible. The app is 2.4 GHz only.
 - Startup is faster in exclusive mode: no longer waits up to 45 s for the hub Wi-Fi at boot.

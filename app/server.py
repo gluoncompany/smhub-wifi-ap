@@ -21,12 +21,12 @@ CONF_FILE = os.path.join(RUN_DIR, "hostapd.conf")
 HOSTAPD_LOG = os.path.join(RUN_DIR, "hostapd.log")
 DNSMASQ_LOG = os.path.join(RUN_DIR, "dnsmasq.log")
 LEASES = os.path.join(RUN_DIR, "dnsmasq.leases")
-BAND_FILE = os.path.join(DATA_DIR, "band_lock.json")
+BAND_FILE = os.path.join(DATA_DIR, "band_lock.json")  # left by versions before 1.0.8 (2.4 GHz band lock)
 CLIENT_FILE = os.path.join(DATA_DIR, "client_wifi.json")
 
 CH_24 = list(range(1, 14))
 # 2.4 GHz only. On 5 GHz the aic8800 AP is not usable: with the hub Wi-Fi connected the driver hangs (the
-# hardware watchdog reboots the hub) and in exclusive mode hostapd reports AP-ENABLED but nothing is seen.
+# hardware watchdog reboots the hub) and with the client disconnected hostapd reports AP-ENABLED but nothing is seen.
 SECURITY = ("open", "wpa2", "wpa2wpa3", "wpa3")
 
 lock = threading.RLock()
@@ -119,7 +119,7 @@ def load_config():
     except (OSError, ValueError):
         c = {}
     d = {"enabled": False, "ssid": "", "password": "", "security": "wpa2", "hidden": False,
-         "band": "2.4", "channel": 0, "country": "ES", "subnet": "10.42.0.1/24", "nat": True, "lock_24": True, "exclusive": True}
+         "band": "2.4", "channel": 0, "country": "ES", "subnet": "10.42.0.1/24", "nat": True}
     d.update({k: v for k, v in c.items() if k in d})
     d["band"] = "2.4"
     if d["channel"] not in CH_24:
@@ -180,8 +180,6 @@ def validate(body, cur):
             raise ApError("err_overlap", str(other))
     c["subnet"] = str(iface)
     c["nat"] = bool(body.get("nat", c["nat"]))
-    c["lock_24"] = bool(body.get("lock_24", c["lock_24"]))
-    c["exclusive"] = bool(body.get("exclusive", c["exclusive"]))
     return c
 
 
@@ -227,13 +225,10 @@ def best_channel(client_name):
     return best
 
 
-def pick_channel(c, client, client_name=None):
-    """-> (channel, mode) where mode is 'follows', 'best' or 'manual'."""
-    cch = client.get("channel") if client else None
+def pick_channel(c, client_name=None):
+    """-> (channel, mode) where mode is 'best' or 'manual'."""
     if c["channel"]:
         return c["channel"], "manual"
-    if cch and cch in CH_24:
-        return cch, "follows"
     try:
         return best_channel(client_name), "best"
     except Exception as e:  # noqa
@@ -241,15 +236,12 @@ def pick_channel(c, client, client_name=None):
         return 6, "best"
 
 
-def hostapd_conf(c, ch, ht40=None):
+def hostapd_conf(c, ch):
     lines = ["interface=%s" % AP_IF, "driver=nl80211", "ctrl_interface=%s" % RUN_DIR,
              "ctrl_interface_group=0", "ssid2=%s" % c["ssid"].encode().hex(), "utf8_ssid=1",
              "hw_mode=g", "channel=%d" % ch,
              "ieee80211n=1", "wmm_enabled=1", "auth_algs=1", "beacon_int=100",
              "ignore_broadcast_ssid=%d" % (1 if c["hidden"] else 0)]
-    if ht40:
-        # same channel width as the hub's own Wi-Fi: the radio runs both interfaces on one channel context
-        lines += ["ht_capab=[%s][SHORT-GI-20][SHORT-GI-40]" % ht40, "obss_interval=0"]
     if c["country"]:
         lines += ["country_code=%s" % c["country"], "ieee80211d=1"]
     sec, pw = c["security"], c["password"]
@@ -337,11 +329,7 @@ def tail(path, n=15):
         return []
 
 
-# ---------------------------------------------------------------- client Wi-Fi band lock
-# The AIC8800 cannot run the AP on 2.4 GHz while the client is connected on 5 GHz (the AP reports
-# AP-ENABLED but the radio stays on the 5 GHz channel and no beacons are sent). While the AP is
-# enabled, the hub's own Wi-Fi profiles are locked to 2.4 GHz; the original band is restored when
-# the AP is turned off.
+# ---------------------------------------------------------------- hub Wi-Fi profiles
 
 def wifi_profiles():
     out = run("nmcli", "-t", "-f", "UUID,TYPE", "connection", "show", check=False).stdout
@@ -367,44 +355,8 @@ def load_band_lock():
         return {}
 
 
-def lock_client_band(cname, client):
-    """Lock Wi-Fi profiles to 2.4 GHz; reconnect if the hub is on 5 GHz. -> (cname, client)."""
-    saved = load_band_lock()
-    changed = False
-    for p in wifi_profiles():
-        if p["band"] != "bg":
-            saved.setdefault(p["uuid"], p["band"])
-            run("nmcli", "connection", "modify", p["uuid"], "802-11-wireless.band", "bg", check=False)
-            changed = True
-            log("locked Wi-Fi profile to 2.4 GHz:", p["name"])
-    if changed:
-        os.makedirs(DATA_DIR, exist_ok=True)
-        with open(BAND_FILE, "w") as f:
-            json.dump(saved, f)
-    if cname and client and (client.get("channel") or 0) > 14:
-        act = run("nmcli", "-t", "-f", "UUID,DEVICE", "connection", "show", "--active", check=False).stdout
-        uuid = next((l.split(":")[0] for l in act.splitlines() if l.endswith(":" + cname)), None)
-        if uuid:
-            log("hub Wi-Fi is on 5 GHz, reconnecting on 2.4 GHz")
-            r = run("nmcli", "-w", "40", "connection", "up", uuid, check=False, timeout=50)
-            if r.returncode != 0:
-                # the network has no 2.4 GHz: give the profile its band back so the hub stays online
-                orig = saved.pop(uuid, "")
-                run("nmcli", "connection", "modify", uuid, "802-11-wireless.band", orig, check=False)
-                with open(BAND_FILE, "w") as f:
-                    json.dump(saved, f)
-                run("nmcli", "-w", "40", "connection", "up", uuid, check=False, timeout=50)
-                state["no24"] = True
-                log("network has no 2.4 GHz, band restored")
-            for _ in range(10):
-                cname, client = client_iface()
-                if (client or {}).get("channel"):
-                    break
-                time.sleep(2)
-    return cname, client
-
-
 def restore_client_band():
+    """Undo the 2.4 GHz band lock of versions before 1.0.8 (called once at startup)."""
     saved = load_band_lock()
     for uuid, band in saved.items():
         run("nmcli", "connection", "modify", uuid, "802-11-wireless.band", band, check=False)
@@ -415,10 +367,11 @@ def restore_client_band():
         pass
 
 
-# ---------------------------------------------------------------- exclusive mode
+# ---------------------------------------------------------------- exclusive AP
 # The AIC8800 does not run AP + client reliably (beacons are intermittent while the client is
-# connected). In exclusive mode the hub's Wi-Fi client is disconnected while the AP is on (its
-# profiles lose autoconnect) and restored when the AP is turned off. The hub then needs Ethernet.
+# connected, and nothing is sent while the client is on 5 GHz). So the hub's Wi-Fi client is
+# disconnected while the AP is on (its profiles lose autoconnect) and restored when the AP is
+# turned off or the service stops. The hub then needs Ethernet.
 
 def wired_uplink():
     out = run("ip", "-4", "route", "show", "default", check=False).stdout
@@ -450,7 +403,7 @@ def release_client_wifi(cname):
         json.dump(saved, f)
     if cname:
         run("nmcli", "device", "disconnect", cname, check=False)
-        log("exclusive mode: hub Wi-Fi client disconnected")
+        log("hub Wi-Fi client disconnected for the AP")
 
 
 def restore_client_wifi():
@@ -478,32 +431,14 @@ def start_ap():
         if not os.access(HOSTAPD, os.X_OK):
             raise ApError("err_no_hostapd", HOSTAPD)
         cname, client = client_iface()
-        if c["exclusive"]:
-            if c["nat"] and not wired_uplink():
-                raise ApError("err_no_ethernet")
-            if load_band_lock():
-                restore_client_band()
-            release_client_wifi(cname)
-            time.sleep(2)
-            cname, client = client_iface()
-            client = dict(client or {}, channel=None)
-        else:
-            if os.path.exists(CLIENT_FILE):
-                restore_client_wifi()
-            if c["lock_24"]:
-                cname, client = lock_client_band(cname, client)
-            elif load_band_lock():
-                restore_client_band()
-        ch, mode = pick_channel(c, client, cname)
-        follows = mode == "follows"
-        cch = (client or {}).get("channel")
-        state["warning"] = None
+        if c["nat"] and not wired_uplink():
+            raise ApError("err_no_ethernet")
+        release_client_wifi(cname)
+        time.sleep(2)
+        cname, client = client_iface()
+        ch, mode = pick_channel(c, cname)
         if ch not in CH_24:
             raise ApError("err_channel")
-        if cch and cch > 14:
-            state["warning"] = ["warn_5ghz", str(ch), str(cch)]
-        elif cch and ch != cch:
-            state["warning"] = ["warn_channel", str(ch), str(cch)]
         ensure_iface(cname, client or {})
         iface = ipaddress.ip_interface(c["subnet"])
         net = iface.network
@@ -512,11 +447,7 @@ def start_ap():
         lo, hi = others[min(8, len(others) - 1)], others[max(-5, -len(others))]
 
         with open(CONF_FILE, "w") as f:
-            ht40 = None
-            if follows and (client or {}).get("width") == 40 and (client or {}).get("center1"):
-                ht40 = "HT40+" if client["center1"] > client["freq"] else "HT40-"
-            state["ht40"] = ht40
-            f.write(hostapd_conf(c, ch, ht40))
+            f.write(hostapd_conf(c, ch))
         os.chmod(CONF_FILE, 0o600)
         run("ip", "link", "set", AP_IF, "down", check=False)
         run("ip", "addr", "flush", "dev", AP_IF, check=False)
@@ -566,7 +497,7 @@ def start_ap():
                            [["-i", AP_IF, "-j", "ACCEPT"],
                             ["-o", AP_IF, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"]])
         state.update(running=True, error=None, error_args=[], started=time.time(),
-                     ap={"iface": AP_IF, "channel": ch, "band": band_of(ch), "follows": follows, "mode": mode, "ht40": state.get("ht40"),
+                     ap={"iface": AP_IF, "channel": ch, "band": band_of(ch), "mode": mode,
                          "ip": str(iface.ip), "net": str(net), "client_iface": cname})
         log("AP started on channel", ch, "ssid", c["ssid"])
 
@@ -695,12 +626,7 @@ def try_start():
 
 
 def watchdog():
-    # give NetworkManager time to bring the client Wi-Fi up so the AP can follow its channel
-    c = load_config()
-    if c["enabled"]:
-        end = time.time() + (0 if c["exclusive"] else 45)
-        while time.time() < end and not (client_iface()[1] or {}).get("channel"):
-            time.sleep(3)
+    if load_config()["enabled"]:
         try_start()
     while True:
         time.sleep(10)
@@ -710,23 +636,13 @@ def watchdog():
                 continue
             hp = state.get("hostapd")
             dead = not state["running"] or not hp or hp.poll() is not None
-            moved = False
-            ap = state["ap"]
-            cch = (client_iface()[1] or {}).get("channel")
-            if c["exclusive"]:
-                if not dead and cch:
-                    moved = True  # the hub Wi-Fi reconnected (e.g. a new profile): release it again
-            else:
-                if not dead and c["lock_24"] and cch and cch > 14 and not state.get("no24"):
-                    moved = True  # the hub went back to 5 GHz (e.g. a new profile): lock and reconnect
-                if not dead and ap and ap.get("mode") != "manual":
-                    # follow the client channel; also switch to it if the hub joins a 2.4 GHz network later
-                    moved = moved or bool(cch and cch in CH_24 and cch != ap["channel"])
+            # the hub Wi-Fi reconnected (e.g. a profile added by hand): release it again
+            moved = not dead and bool((client_iface()[1] or {}).get("channel"))
             if dead or moved:
                 if dead and state["fails"] >= 5 and time.time() - state.get("last_try", 0) < 300:
                     continue
                 state["last_try"] = time.time()
-                log("restarting AP", "(client channel changed)" if moved else "(not running)")
+                log("restarting AP", "(hub Wi-Fi reconnected)" if moved else "(not running)")
                 try_start()
 
 
@@ -779,7 +695,6 @@ class Handler(BaseHTTPRequestHandler):
                     save_config(c)
                     if c["enabled"]:
                         state["fails"] = 0
-                        state["no24"] = False
                         try:
                             start_ap()
                         except ApError as e:
@@ -792,7 +707,6 @@ class Handler(BaseHTTPRequestHandler):
                     c["enabled"] = bool(body.get("enabled"))
                     save_config(c)
                     state["fails"] = 0
-                    state["no24"] = False
                     if c["enabled"]:
                         try:
                             start_ap()
@@ -801,7 +715,6 @@ class Handler(BaseHTTPRequestHandler):
                             raise
                     else:
                         stop_ap()
-                        restore_client_band()
                         restore_client_wifi()
                         state.update(error=None, error_args=[], warning=None)
                 return self.send(200, get_state())
@@ -820,6 +733,8 @@ def main():
         os.remove(os.path.join(DATA_DIR, "ap5_running"))  # left over by 1.0.6 (5 GHz test)
     except OSError:
         pass
+    if load_band_lock():
+        restore_client_band()  # 2.4 GHz band lock left by versions before 1.0.8
     # clean leftovers from a previous run
     run("pkill", "-f", "dnsmasq.*--interface=" + AP_IF, check=False)
     run("pkill", "-f", CONF_FILE, check=False)

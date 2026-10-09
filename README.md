@@ -2,13 +2,11 @@
 
 A small app for **SMLIGHT SMHUB OS** that creates a 2.4 GHz Wi-Fi network from the hub, meant for connecting home-automation devices directly to the hub.
 
-- **Exclusive AP mode (default, recommended)**: while the AP is on, the hub's own Wi-Fi connection is disconnected and the hub uses **Ethernet**; it reconnects when the AP is turned off. Before turning the AP on, the app asks for confirmation and shows whether a wired connection is detected.
-- **AP + client at the same time** (exclusive mode off): a virtual `ap0` interface on the same radio while the hub keeps its Wi-Fi uplink. Works poorly with the AIC8800 (see below).
+- **The hub uses Ethernet while the AP is on**: the hub's own Wi-Fi connection is disconnected when the AP is turned on and reconnected when it is turned off (the AIC8800 cannot run both reliably, see below). Before turning the AP on, the app asks for confirmation and shows whether a wired connection is detected.
 - **DHCP and DNS** for the clients (dnsmasq from SMHUB OS) and **internet sharing with NAT** (optional).
 - **WPA2, WPA2/WPA3, WPA3 or open**, hidden SSID, password generator.
-- **Automatic channel**: scans and picks the least busy of channels 1, 6 and 11. With exclusive mode off and the hub on a 2.4 GHz Wi-Fi, the AP uses (and follows) the hub's channel instead. Manual channel 1–13 is also possible.
+- **Automatic channel**: scans and picks the least busy of channels 1, 6 and 11. Manual channel 1–13 is also possible.
 - **QR code** to connect a phone, and a **list of connected devices** (name, MAC, IP, signal, connected time, traffic).
-- With exclusive mode off, keeps the hub's own Wi-Fi on 2.4 GHz while the AP is on (required by the AIC8800 chip), restoring the original band afterwards.
 - The AP comes back after a reboot if it was enabled; a watchdog restarts it if hostapd stops.
 - Shows up in the hub panel like any other app (sidebar + iframe), with a **Spanish / English** UI and light/dark theme.
 
@@ -20,8 +18,8 @@ A small app for **SMLIGHT SMHUB OS** that creates a 2.4 GHz Wi-Fi network from t
 
 **AIC8800 limitations (SMHUB Nano):**
 
-- **2.4 GHz only.** An AP on 5 GHz hangs the driver while the hub Wi-Fi is connected (the hardware watchdog reboots the hub), and in exclusive mode hostapd reports AP-ENABLED on channels 36–48 but the network is not visible.
-- **AP + Wi-Fi client together is unreliable.** On the same 2.4 GHz channel the AP beacons are intermittent (the network appears and disappears, phones fail to connect), and while the hub is connected on 5 GHz the AP does not transmit at all. That is why **exclusive mode** is the default: the hub needs to be connected by **Ethernet** while the AP is on.
+- **2.4 GHz only.** An AP on 5 GHz hangs the driver while the hub Wi-Fi is connected (the hardware watchdog reboots the hub), and with the hub Wi-Fi disconnected hostapd reports AP-ENABLED on channels 36–48 but the network is not visible.
+- **AP + Wi-Fi client together is unreliable.** On the same 2.4 GHz channel the AP beacons are intermittent (the network appears and disappears, phones fail to connect), and while the hub is connected on 5 GHz the AP does not transmit at all. That is why the app always disconnects the hub Wi-Fi while the AP is on: the hub needs to be connected by **Ethernet** (required when internet sharing is on).
 
 ## How it works
 
@@ -81,5 +79,5 @@ MIT, see [LICENSE](LICENSE). The bundled hostapd binary is built from the unmodi
 ## Notes
 
 - This is not an official SMLIGHT app. The app format was worked out by inspecting SMHUB OS 1.0.2 and may change in future releases.
-- Turning the AP on or off never touches Ethernet. In exclusive mode the hub's Wi-Fi connection is disconnected while the AP is on and restored when it is turned off (or when the service stops); with exclusive mode off it is left connected.
-- With **netconfig** 1.0.5 or later, the hub Wi-Fi controls are blocked in netconfig while the exclusive AP is on, so both apps never fight over the radio.
+- Turning the AP on or off never touches Ethernet. The hub's Wi-Fi connection is disconnected while the AP is on and restored when it is turned off (or when the service stops). The AP state survives reboots: if it was on, it comes back on and the hub Wi-Fi stays disconnected.
+- With **netconfig** 1.0.5 or later, the hub Wi-Fi controls are blocked in netconfig while the AP is on, so both apps never fight over the radio.
